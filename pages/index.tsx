@@ -1,5 +1,6 @@
 import {useEffect, useState} from 'react';
-
+import {css, Global} from '@emotion/react';
+import styled from '@emotion/styled';
 
 function useAudio() {
   const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
@@ -26,7 +27,9 @@ function useSineGenerator(ctx: AudioContext) {
   
     oscNode.connect(gainNode);
     gainNode.connect(ctx.destination);
+    try {
     oscNode.start();
+  } catch(e) {console.error(e);}
   }, []);
 
   useEffect(() => {
@@ -40,7 +43,6 @@ function useSineGenerator(ctx: AudioContext) {
   }, [currentInterval, referenceFrequency]);
 
   useEffect(() => {
-    //oscNode.frequency.value = currentFrequency;
     oscNode.frequency.setValueAtTime(currentFrequency, 0);
   }, [currentFrequency]);
 
@@ -63,6 +65,61 @@ function useSineGenerator(ctx: AudioContext) {
 }
 
 
+const Container = (props: any) => {
+  return (<>
+    <Global styles={css`
+      #__next {
+        background-color: #333333;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around;
+        align-items: center;
+        height: 100vh;
+
+        font-family: sans-serif;
+        color: white;
+        font-size: 1.3rem;
+      }
+    `} />
+    {props.children}
+  </>);
+}
+
+const PlaybackControlSection = (props: any) => {
+  const _div = styled.div`
+
+  button {
+    border: 3px solid purple;
+    padding: 2em;
+  }
+  `;
+  return (
+    <_div>
+      {props.children}
+    </_div>
+  );
+};
+
+const IntervalControlSection = (props: any) => {
+  const _div = styled.div`
+  display: flex;
+  justify-content: space-evenly;
+  width: 100%;
+
+  button {
+    border: 3px solid purple;
+    padding: 2em;
+    width: 40%;
+  }
+  `;
+  return (
+    <_div>
+      {props.children}
+    </_div>
+  );
+};
+
+
 export default function Home() {
   if(typeof window === 'undefined') {
     return null;
@@ -75,22 +132,29 @@ export default function Home() {
     setReferenceFrequency(referenceNote);
   }, [referenceNote]);
 
-  return [
-  <div><button onClick={() => {
-    if(isPlaying) {pause()}
-    else {play()}
-  }}>{isPlaying ? 'Pause' : 'Play' }</button></div>,
-  <div>
-<button onClick={() => {
-  toneUp();
-}}>Up</button>
-  <button onClick={() => {
-    toneDown();
-  }}>Down</button>
-  </div>,
+  return (
+    <Container>
 
-  <div><div>Reference: ({referenceNote}Hz)</div><div><input type="range" min={420} max={460} value={referenceNote} onChange={(e) => setReferenceNote(e.target.valueAsNumber) } /></div></div>,
-  <div>Current: ({currentFrequency}Hz):</div>,
-  <div>Interval: {currentInterval}</div>
-];
+    <div>Current: ({currentFrequency}Hz):</div>
+    <div>Interval: {currentInterval}</div>
+
+      <IntervalControlSection>
+  <button onClick={() => {
+    toneUp();
+  }}>Up</button>
+    <button onClick={() => {
+      toneDown();
+    }}>Down</button>
+    </IntervalControlSection>
+
+      <PlaybackControlSection>
+      <button onClick={() => {
+      if(isPlaying) {pause()}
+      else {play()}
+    }}>{isPlaying ? 'Pause' : 'Play' }</button>
+      </PlaybackControlSection>
+
+    <div><div>Reference: ({referenceNote}Hz)</div><div><input type="range" min={420} max={460} value={referenceNote} onChange={(e) => setReferenceNote(e.target.valueAsNumber) } /></div></div>
+  </Container>
+  );
 }
