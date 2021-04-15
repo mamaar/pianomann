@@ -68,6 +68,10 @@ function useSineGenerator(ctx: AudioContext) {
 const Container = (props: any) => {
   return (<>
     <Global styles={css`
+      body {
+        padding: 0;
+        margin: 0;
+      }
       #__next {
         background-color: #333333;
         display: flex;
@@ -151,7 +155,7 @@ export default function Home() {
       <button onClick={() => {
       if(isPlaying) {pause()}
       else {play()}
-    }}>{isPlaying ? 'Pause' : 'Play' }</button>
+    }}>{isPlaying ? 'Stop' : 'Play' }</button>
       </PlaybackControlSection>
 
     <div><div>Reference: ({referenceNote}Hz)</div><div><input type="range" min={420} max={460} value={referenceNote} onChange={(e) => setReferenceNote(e.target.valueAsNumber) } /></div></div>
