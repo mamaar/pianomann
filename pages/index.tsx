@@ -123,6 +123,26 @@ const IntervalControlSection = (props: any) => {
   );
 };
 
+const ReferenceControlSection = (props: any) => {
+  const _div = styled.div`
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+
+  * {
+    width: 90%;
+  }
+  `;
+  return (
+    <_div>
+      {props.children}
+    </_div>
+  );
+};
+
 
 export default function Home() {
   if(typeof window === 'undefined') {
@@ -158,7 +178,12 @@ export default function Home() {
     }}>{isPlaying ? 'Stop' : 'Play' }</button>
       </PlaybackControlSection>
 
-    <div><div>Reference: ({referenceNote}Hz)</div><div><input type="range" min={420} max={460} value={referenceNote} onChange={(e) => setReferenceNote(e.target.valueAsNumber) } /></div></div>
+    <ReferenceControlSection>
+      <div>Reference: ({referenceNote}Hz)</div>
+      <div>
+        <input type="range" min={420} max={460} value={referenceNote} onChange={(e) => setReferenceNote(e.target.valueAsNumber) } />
+      </div>
+    </ReferenceControlSection>
   </Container>
   );
 }
