@@ -1,17 +1,32 @@
-import {useEffect, useState} from 'react';
-import {css, Global} from '@emotion/react';
+import { useEffect, useState, useRef } from 'react';
+import { css, Global } from '@emotion/react';
 import styled from '@emotion/styled';
 
 function useAudio() {
+  if (typeof window === 'undefined') {
+    return { ctx: null };
+  }
   const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-  const [ctx] =  useState(new AudioContext());
+  const ctx = useRef(new AudioContext());
 
-  
 
-  return {ctx};
+
+  return { ctx: ctx.current };
 }
 
 function useSineGenerator(ctx: AudioContext) {
+  if (ctx === null) {
+    return {
+      play: () => { },
+      pause: () => { },
+      toneUp: () => { },
+      toneDown: () => { },
+      currentFrequency: 440,
+      currentInterval: 0,
+      isPlaying: false,
+      setReferenceFrequency: (_) => { },
+    };
+  }
 
   const [oscNode] = useState(ctx.createOscillator());
   const [gainNode] = useState(ctx.createGain());
@@ -24,12 +39,9 @@ function useSineGenerator(ctx: AudioContext) {
 
   useEffect(() => {
     gainNode.gain.value = 0;
-  
+
     oscNode.connect(gainNode);
     gainNode.connect(ctx.destination);
-    try {
-    oscNode.start();
-  } catch(e) {console.error(e);}
   }, []);
 
   useEffect(() => {
@@ -47,12 +59,15 @@ function useSineGenerator(ctx: AudioContext) {
   }, [currentFrequency]);
 
 
-  return { 
+  return {
     play: () => {
+      try {
+        oscNode.start();
+      } catch (e) { console.error(e); }
       setIsPlaying(true);
-    }, 
-    pause: () => { 
-        setIsPlaying(false);
+    },
+    pause: () => {
+      setIsPlaying(false);
     },
     toneUp: () => setCurrentInterval(currentInterval + 1),
     toneDown: () => setCurrentInterval(currentInterval - 1),
@@ -145,11 +160,8 @@ const ReferenceControlSection = (props: any) => {
 
 
 export default function Home() {
-  if(typeof window === 'undefined') {
-    return null;
-  }
-  const {ctx} = useAudio();
-  const {play, pause, isPlaying, toneUp, toneDown, currentFrequency, currentInterval, setReferenceFrequency} = useSineGenerator(ctx);
+  const { ctx } = useAudio();
+  const { play, pause, isPlaying, toneUp, toneDown, currentFrequency, currentInterval, setReferenceFrequency } = useSineGenerator(ctx);
   const [referenceNote, setReferenceNote] = useState<number>(440);
 
   useEffect(() => {
@@ -159,31 +171,31 @@ export default function Home() {
   return (
     <Container>
 
-    <div>Current: ({currentFrequency}Hz):</div>
-    <div>Interval: {currentInterval}</div>
+      <div>Current: ({currentFrequency}Hz):</div>
+      <div>Interval: {currentInterval}</div>
 
       <IntervalControlSection>
-  <button onClick={() => {
-    toneUp();
-  }}>Up</button>
-    <button onClick={() => {
-      toneDown();
-    }}>Down</button>
-    </IntervalControlSection>
+        <button onClick={() => {
+          toneUp();
+        }}>Up</button>
+        <button onClick={() => {
+          toneDown();
+        }}>Down</button>
+      </IntervalControlSection>
 
       <PlaybackControlSection>
-      <button onClick={() => {
-      if(isPlaying) {pause()}
-      else {play()}
-    }}>{isPlaying ? 'Stop' : 'Play' }</button>
+        <button onClick={() => {
+          if (isPlaying) { pause() }
+          else { play() }
+        }}>{isPlaying ? 'Stop' : 'Play'}</button>
       </PlaybackControlSection>
 
-    <ReferenceControlSection>
-      <div>Reference: ({referenceNote}Hz)</div>
-      <div>
-        <input type="range" min={420} max={460} value={referenceNote} onChange={(e) => setReferenceNote(e.target.valueAsNumber) } />
-      </div>
-    </ReferenceControlSection>
-  </Container>
+      <ReferenceControlSection>
+        <div>Reference: ({referenceNote}Hz)</div>
+        <div>
+          <input type="range" min={420} max={460} value={referenceNote} onChange={(e) => setReferenceNote(e.target.valueAsNumber)} />
+        </div>
+      </ReferenceControlSection>
+    </Container>
   );
 }
