@@ -1,35 +1,12 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, forwardRef, MutableRefObject } from 'react';
 import { css, Global } from '@emotion/react';
 import styled from '@emotion/styled';
 
-function useAudio() {
-  if (typeof window === 'undefined') {
-    return { ctx: null };
-  }
-  const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-  const ctx = useRef(new AudioContext());
-
-
-
-  return { ctx: ctx.current };
-}
-
-function useSineGenerator(ctx: AudioContext) {
-  if (ctx === null) {
-    return {
-      play: () => { },
-      pause: () => { },
-      toneUp: () => { },
-      toneDown: () => { },
-      currentFrequency: 440,
-      currentInterval: 0,
-      isPlaying: false,
-      setReferenceFrequency: (_) => { },
-    };
-  }
-
-  const [oscNode] = useState(ctx.createOscillator());
-  const [gainNode] = useState(ctx.createGain());
+function useSineGenerator() {
+  const [isStarted, setIsStarted] = useState<boolean>(false);
+  const ctx = useRef<AudioContext | null>(null);
+  const oscNode = useRef<OscillatorNode | null>(null);
+  const gainNode = useRef<GainNode | null>(null);
 
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentInterval, setCurrentInterval] = useState<number>(0);
@@ -37,46 +14,133 @@ function useSineGenerator(ctx: AudioContext) {
   const [currentFrequency, setCurrentFrequency] = useState(referenceFrequency);
 
 
-  useEffect(() => {
-    gainNode.gain.value = 0;
+  function trySetup() {
+    if (ctx.current !== null) {
+      return;
+    }
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    const context: AudioContext = new AudioContext();
+    const osc = context.createOscillator();
+    const gain = context.createGain();
 
-    oscNode.connect(gainNode);
-    gainNode.connect(ctx.destination);
-  }, []);
+    gain.gain.value = 0;
 
-  useEffect(() => {
-    gainNode.gain.value = isPlaying ? 1 : 0;
-  }, [isPlaying]);
+    osc.connect(gain);
+    gain.connect(context.destination);
 
-  useEffect(() => {
-    const octaves: number = currentInterval / 12;
+    osc.start();
+
+    ctx.current = context;
+    oscNode.current = osc;
+    gainNode.current = gain;
+
+  }
+
+  function calculateFrequency(interval: number, referenceFrequency: number) {
+    const octaves: number = interval / 12;
     const frequency = referenceFrequency * Math.pow(2, octaves);
-    setCurrentFrequency(frequency);
-  }, [currentInterval, referenceFrequency]);
-
-  useEffect(() => {
-    oscNode.frequency.setValueAtTime(currentFrequency, 0);
-  }, [currentFrequency]);
-
+    return frequency;
+  }
 
   return {
     play: () => {
-      try {
-        oscNode.start();
-      } catch (e) { console.error(e); }
-      setIsPlaying(true);
+      setIsStarted(prevState => {
+        if (prevState === true) {
+          return true;
+        }
+        trySetup();
+        return true;
+      });
+      setIsPlaying((prevState) => {
+        gainNode.current.gain.value = 1;
+        return true;
+      });
     },
     pause: () => {
-      setIsPlaying(false);
+      setIsPlaying((prevState) => {
+        gainNode.current.gain.value = 0;
+        return false;
+      });
     },
-    toneUp: () => setCurrentInterval(currentInterval + 1),
-    toneDown: () => setCurrentInterval(currentInterval - 1),
+    toneUp: () => setCurrentInterval(prevState => {
+      const newInterval = prevState + 1;
+      const newFreq = calculateFrequency(newInterval, referenceFrequency);
+
+      oscNode.current.frequency.setValueAtTime(newFreq, 0);
+      setCurrentFrequency(newFreq)
+      return newInterval;
+    }),
+    toneDown: () => setCurrentInterval(prevState => {
+      const newInterval = prevState - 1;
+      const newFreq = calculateFrequency(newInterval, referenceFrequency);
+
+      oscNode.current.frequency.setValueAtTime(newFreq, 0);
+      setCurrentFrequency(newFreq)
+      return newInterval;
+    }),
     currentFrequency,
     currentInterval,
     isPlaying,
 
     setReferenceFrequency,
   };
+}
+
+function useSpeech(playTone, stopTone, upInterval, downInterval) {
+  if (typeof window === 'undefined') {
+    return {
+      start: () => { },
+    };
+  }
+  var SpeechRecognition = SpeechRecognition || (window as any).webkitSpeechRecognition;
+  var SpeechGrammarList = SpeechGrammarList || (window as any).webkitSpeechGrammarList;
+  var SpeechRecognitionEvent = SpeechRecognitionEvent || (window as any).webkitSpeechRecognitionEvent;
+
+  const IDENTIFIED_COMMANDS = ['up', 'down', 'start', 'stop'];
+  const grammar = `#JSGF V1.0; grammar colors; public <color> = ${IDENTIFIED_COMMANDS.join(' | ')};`
+
+  const COMMAND_MAP = {
+    'up': upInterval,
+    'down': downInterval,
+    'start': playTone,
+    'stop': stopTone,
+  }
+
+  const recognition = useRef(new SpeechRecognition());
+  const speechRecognitionList = useRef(new SpeechGrammarList());
+  speechRecognitionList.current.addFromString(grammar, 1);
+  recognition.current.grammars = speechRecognitionList.current;
+  recognition.current.continuous = true;
+  recognition.current.lang = 'en-US';
+  recognition.current.interimResults = false;
+  recognition.current.maxAlternatives = 1;
+
+  recognition.current.onresult = (event) => {
+    const numResults = event.results.length;
+    const result = event.results[numResults - 1][0];
+    const transcript = result.transcript.trim();
+    const commands = transcript.split(' ').filter(r => r.length && IDENTIFIED_COMMANDS.indexOf(r) !== -1);
+    for (const command of commands) {
+      const func = COMMAND_MAP[command];
+      if (func) {
+        func();
+      }
+    }
+
+  }
+  recognition.current.onspeechend = () => {
+    recognition.current.stop();
+  }
+  recognition.current.onerror = (event) => {
+    console.error(event);
+  }
+  function start() {
+    recognition.current.start();
+  }
+
+  return {
+    start,
+  }
 }
 
 
@@ -160,9 +224,9 @@ const ReferenceControlSection = (props: any) => {
 
 
 export default function Home() {
-  const { ctx } = useAudio();
-  const { play, pause, isPlaying, toneUp, toneDown, currentFrequency, currentInterval, setReferenceFrequency } = useSineGenerator(ctx);
+  const { play, pause, isPlaying, toneUp, toneDown, currentFrequency, currentInterval, setReferenceFrequency } = useSineGenerator();
   const [referenceNote, setReferenceNote] = useState<number>(440);
+  const { start } = useSpeech(play, pause, toneUp, toneDown);
 
   useEffect(() => {
     setReferenceFrequency(referenceNote);
@@ -186,7 +250,7 @@ export default function Home() {
       <PlaybackControlSection>
         <button onClick={() => {
           if (isPlaying) { pause() }
-          else { play() }
+          else { play(); start() }
         }}>{isPlaying ? 'Stop' : 'Play'}</button>
       </PlaybackControlSection>
 
