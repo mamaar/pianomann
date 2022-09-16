@@ -99,13 +99,8 @@ function useSpeech(playTone, stopTone, upInterval, downInterval) {
   const IDENTIFIED_COMMANDS = ['up', 'down', 'start', 'stop'];
   const grammar = `#JSGF V1.0; grammar colors; public <color> = ${IDENTIFIED_COMMANDS.join(' | ')};`
 
-  const COMMAND_MAP = {
-    'up': upInterval,
-    'down': downInterval,
-    'start': playTone,
-    'stop': stopTone,
-  }
 
+  const [isStarted, setIsStarted] = useState(false);
   const recognition = useRef(new SpeechRecognition());
   const speechRecognitionList = useRef(new SpeechGrammarList());
   speechRecognitionList.current.addFromString(grammar, 1);
@@ -115,6 +110,14 @@ function useSpeech(playTone, stopTone, upInterval, downInterval) {
   recognition.current.interimResults = false;
   recognition.current.maxAlternatives = 1;
 
+  const COMMAND_MAP = {
+    'up': upInterval,
+    'down': downInterval,
+    'start': playTone,
+    'stop': () => {
+      stopTone();
+    },
+  }
   recognition.current.onresult = (event) => {
     const numResults = event.results.length;
     const result = event.results[numResults - 1][0];
@@ -126,18 +129,15 @@ function useSpeech(playTone, stopTone, upInterval, downInterval) {
         func();
       }
     }
-
-  }
-  recognition.current.onspeechend = () => {
-    recognition.current.stop();
   }
   recognition.current.onerror = (event) => {
     console.error(event);
   }
   function start() {
-    recognition.current.start();
+    if (!isStarted) {
+      recognition.current.start();
+    }
   }
-
   return {
     start,
   }
@@ -249,8 +249,13 @@ export default function Home() {
 
       <PlaybackControlSection>
         <button onClick={() => {
-          if (isPlaying) { pause() }
-          else { play(); start() }
+          if (isPlaying) {
+            pause()
+          }
+          else {
+            play();
+            start();
+          }
         }}>{isPlaying ? 'Stop' : 'Play'}</button>
       </PlaybackControlSection>
 
